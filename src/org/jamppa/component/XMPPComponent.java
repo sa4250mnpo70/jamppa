@@ -18,6 +18,9 @@ package org.jamppa.component;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Properties;
+import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.TimeUnit;
 
 import org.apache.log4j.Logger;
 import org.dom4j.Element;
@@ -50,6 +53,8 @@ public class XMPPComponent extends AbstractComponent implements PacketSender  {
 	private String name;
 	private String discoInfoIdentityCategory;
 	private String discoInfoIdentityCategoryType;
+	
+	private Map<String, PacketCallback> packetCallbacks = new HashMap<String, PacketCallback>();
 	
 	/**
 	 * @param configuration
@@ -209,5 +214,38 @@ public class XMPPComponent extends AbstractComponent implements PacketSender  {
 		
 		Thread t = new Thread(componentRunnable, "xmpp-hanging-thread");
 		t.start();
+	}
+	
+	/* (non-Javadoc)
+	 * @see org.xmpp.component.AbstractComponent#handleIQResult(org.xmpp.packet.IQ)
+	 */
+	@Override
+	protected void handleIQResult(IQ iq) {
+		PacketCallback callback = packetCallbacks.get(iq.getID());
+		if (callback != null) {
+			callback.handle(iq);
+		}
+	}
+	
+	/* (non-Javadoc)
+	 * @see org.jamppa.component.PacketSender#syncSendPacket(org.xmpp.packet.Packet)
+	 */
+	@Override
+	public Packet syncSendPacket(Packet packet) {
+		final BlockingQueue<Packet> queue = new ArrayBlockingQueue<Packet>(1);
+		packetCallbacks.put(packet.getID(), new PacketCallback() {
+			@Override
+			public void handle(Packet packet) {
+				queue.add(packet);
+			}
+		});
+		send(packet);
+		try {
+			return queue.poll(5, TimeUnit.SECONDS);
+		} catch (InterruptedException e) {
+			throw new RuntimeException(e);
+		} finally {
+			packetCallbacks.remove(packet.getID());
+		}
 	}
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2012 buddycloud
+ * Copyright 2011 buddycloud
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -21,9 +21,8 @@ import org.xmpp.packet.Packet;
  * @author Abmar
  *
  */
-public interface PacketSender {
+public interface PacketCallback {
 
-	void sendPacket(Packet packet);
+	void handle(Packet packet);
 	
-	Packet syncSendPacket(Packet packet);
 }
